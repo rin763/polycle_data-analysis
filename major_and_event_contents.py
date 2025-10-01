@@ -41,7 +41,7 @@ else:
 
 plt.rcParams['axes.unicode_minus'] = False
 
-file_name = "/Users/rin/Documents/Polycle/polycle_data-analysis/PXイベント参加者DB_Rin.csv"
+file_name = "/Users/rin/Documents/Polycle/polycle_data-analysis/PXイベント参加者DB.csv"
 
 # DataFrameへの読み込み
 try:
