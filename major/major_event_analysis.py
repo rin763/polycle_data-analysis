@@ -176,7 +176,6 @@ analysis_target = 'Major_Category_EN'
 
 manual_keywords_japanese = ['シュウカツ', 'オオニンズウ', 'コウリュウ', 'ワイワイ', 'ジョウホウ','OBOG', 'オンライン']
 
-words_to_exclude = ['デキル', 'テイキョウ']
 
 # 自動抽出された上位10単語を取得
 tfidf_cols = [col for col in df.columns if col.startswith('tfidf_')]
@@ -188,25 +187,18 @@ top_auto_keywords = [
 # 3. 自動抽出単語と手動単語を統合
 all_target_words = list(set(top_auto_keywords + manual_keywords_japanese))
 
-# 4. 除外リストに基づいてキーワードをフィルタリング
-final_keywords_to_use = [
-    word for word in all_target_words
-    if word not in words_to_exclude
-]
-
-
-final_keywords_to_use = [
-    f'tfidf_{word}' for word in final_keywords_to_use
+all_target_words = [
+    f'tfidf_{word}' for word in all_target_words
     if f'tfidf_{word}' in df.columns
 ]
 
 print("--- 💡 フィルタリング後の最終キーワード ---")
-print(f"使用するキーワード: {len(final_keywords_to_use)} 個")
-print(final_keywords_to_use)
+print(f"使用するキーワード: {len(all_target_words)} 個")
+print(all_target_words)
 
 
 # 1. 【修正】集計に使用するTF-IDF列名の定義
-keywords_to_use_for_agg = [col for col in final_keywords_to_use if col in df.columns]
+keywords_to_use_for_agg = [col for col in all_target_words if col in df.columns]
 
 if not keywords_to_use_for_agg:
     print("Error: None of the specified keywords were found as columns in the DataFrame. Stopping aggregation.")
@@ -215,39 +207,6 @@ if not keywords_to_use_for_agg:
 else:
     print(f"✅ 集計に使用するTF-IDF列: {keywords_to_use_for_agg}")
 
-    # 2. 集計（Major_Category_ENを使用）
-    analysis_target = 'Major_Category_EN'
-
-    # 【修正点】実際に存在する日本語の列名リストを使用
-    tfidf_agg = df.groupby(analysis_target)[keywords_to_use_for_agg].mean()
-
-    # Calculate mail counts separately
-    if 'メールアドレス' in df.columns:
-        count_agg = df.groupby(analysis_target)['メールアドレス'].size().to_frame(name='mail_count')
-    else:
-        print("Error: 'メールアドレス' column not found in the DataFrame. Cannot calculate mail counts.")
-        count_agg = pd.DataFrame(index=df[analysis_target].unique())
-
-
-    # Merge the two aggregated DataFrames
-    if not count_agg.empty:
-        pivot_data_en = tfidf_agg.join(count_agg, how='left')
-    else:
-        pivot_data_en = tfidf_agg
-
-
-    # TF-IDFのNaNを0に置換
-    pivot_data_en = pivot_data_en.fillna(0)
-
-    # 参加者3名以上のカテゴリーに絞る (Check if mail_count exists and then filter)
-    if 'mail_count' in pivot_data_en.columns:
-        pivot_data_en = pivot_data_en[pivot_data_en['mail_count'] > 2].drop(columns=['mail_count']).reset_index()
-    else:
-        print("Warning: 'mail_count' column not available for filtering. Proceeding without filtering by participant count.")
-        pivot_data_en = pivot_data_en.reset_index()
-
-
-    print("✅ データ集計が完了しました。")
 
 
 analysis_target = 'Major_Category_EN'
@@ -255,7 +214,7 @@ analysis_target = 'Major_Category_EN'
 # 1. データ集計と前処理
 
 # Calculate TF-IDF means separately
-tfidf_agg = df.groupby(analysis_target)[final_keywords_to_use].mean()
+tfidf_agg = df.groupby(analysis_target)[all_target_words].mean()
 
 # Calculate mail counts separately
 if 'メールアドレス' in df.columns:
@@ -299,12 +258,14 @@ plt.figure(figsize=(16, max(8, len(pivot_data_top_final) * 0.8)))
 if analysis_target in pivot_data_top_final.columns and not pivot_data_top_final.empty:
     heatmap_data = pivot_data_top_final.set_index(analysis_target)
 
-    # 横軸の順序を連番の順に固定 (置き換え後の列名を使用)
     final_number_columns = number_labels
     heatmap_data = heatmap_data[final_number_columns]
 
+    # データを転置して縦軸と横軸を逆にする
+    heatmap_data_transposed = heatmap_data.T
+    
     sns.heatmap(
-        heatmap_data,
+        heatmap_data_transposed,
         cmap='YlGnBu',
         annot=True,
         fmt=".3f",
@@ -314,27 +275,32 @@ if analysis_target in pivot_data_top_final.columns and not pivot_data_top_final.
     )
 
     plt.title('Major Category Event Interest Heatmap (Keyword Index)')
-    plt.ylabel('Major Category')
-    plt.xlabel('Keyword Index (0, 1, 2, 3, ...)')
-    plt.xticks(rotation=0)
+    plt.ylabel('Keyword Index (0, 1, 2, 3, ...)')
+    plt.xlabel('Major Category')
+    plt.xticks(rotation=45)
     plt.tight_layout()
     
     # グラフをファイルに保存
-    output_filename = 'major_category_heatmap.png'
+    output_filename = 'major/major_event_heatmap.png'
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"✅ ヒートマップを '{output_filename}' に保存しました。")
     
-    # GUIウィンドウを開かずにプログラムを終了
     plt.close()
 
 else:
     print("Warning: Final data for heatmap is empty or missing the index column. Cannot plot.")
 
 
+
+# キーワード対応表の出力
 print("\n--- 💡 キーワード対応表 ---")
-japanese_keywords = [kw.replace('tfidf_', '') for kw in final_keywords_to_use]
+japanese_keywords = [kw.replace('tfidf_', '') for kw in all_target_words]
 keyword_table = pd.DataFrame({
-    # 'Index': number_labels,
+    'Index': number_labels,
     'Keyword (Japanese)': japanese_keywords
 })
 print(keyword_table)
+
+# キーワード対応表をファイルに保存
+keyword_table.to_csv('major/major_event_heatmap_keywords.txt', sep='\t', index=False)
+print("✅ キーワード対応表を 'major_heatmap_keywords.txt' に保存しました。")
