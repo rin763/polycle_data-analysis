@@ -1,16 +1,16 @@
-# 必要なライブラリをインストール
-!pip install -q mecab-python3 unidic-lite
-!pip install -q scikit-learn pandas numpy fugashi ipadic
+# pip install -q mecab-python3 unidic-lite
+# pip install -q scikit-learn pandas numpy fugashi ipadic matplotlib seaborn
 
 import pandas as pd
 import numpy as np
-from google.colab import files
 import MeCab
 from sklearn.feature_extraction.text import TfidfVectorizer
+import matplotlib
+matplotlib.use('Agg')  # GUIを使わないバックエンドを設定
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# MeCabのTaggerを初期化 (日本語処理用)
+# MeCabのTaggerを初期化
 try:
     # 辞書が正しくインストールされているか確認
     tagger = MeCab.Tagger()
@@ -19,10 +19,29 @@ except Exception as e:
     tagger = MeCab.Tagger("-r /etc/mecabrc -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd")
 
 # グラフの日本語表示設定
-plt.rcParams['font.family'] = 'IPAexGothic'
+import matplotlib.font_manager as fm
+
+# 利用可能な日本語フォントを検索
+japanese_fonts = ['Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', 'Takao Gothic']
+available_fonts = [f.name for f in fm.fontManager.ttflist]
+
+japanese_font = None
+for font in japanese_fonts:
+    if font in available_fonts:
+        japanese_font = font
+        break
+
+if japanese_font:
+    plt.rcParams['font.family'] = japanese_font
+    print(f"✅ 日本語フォント '{japanese_font}' を設定しました。")
+else:
+    print("⚠️ 日本語フォントが見つかりません。デフォルトフォントを使用します。")
+    # フォールバック: システムのデフォルトフォントを使用
+    plt.rcParams['font.family'] = 'DejaVu Sans'
+
 plt.rcParams['axes.unicode_minus'] = False
 
-file_name = "/content/PXイベント参加者DB_Rin.csv"
+file_name = "/Users/rin/Documents/Polycle/polycle_data-analysis/PXイベント参加者DB_Rin.csv"
 
 # DataFrameへの読み込み
 try:
@@ -72,9 +91,6 @@ df['週末フラグ'] = pd.to_datetime(df['日にち'], errors='coerce').dt.dayo
 
 print("TF-IDFベクトルがデータに追加されました。")
 
-# MeCabの初期化はステップ1で完了していることを前提とします。
-# df（DataFrame）はステップ1, 2のデータクレンジングが完了しているものとします。
-
 def categorize_major(major_name):
     """
     学科名を指定された11のカテゴリに分類する関数
@@ -84,7 +100,6 @@ def categorize_major(major_name):
 
     name = str(major_name).upper()
 
-    # --- キーワードに基づく分類 ---
     if '情報' in name or '資訊' in name or '系統' in name or 'CS' in name or '資' in name:
         return '情報'
     if '医学' in name or '醫' in name or '薬学' in name or '營養' in name:
@@ -113,14 +128,12 @@ def categorize_major(major_name):
 
     return 'その他'
 
-# 新しいカテゴリ列をDataFrameに追加
 df['学科カテゴリー'] = df['学科'].apply(categorize_major)
 
 print("✅ 学科名のカテゴリー分類が完了しました。")
 print(df['学科カテゴリー'].value_counts())
 print(df['学科カテゴリー'])
 
-# 「その他」に分類された元の学科名を表示する
 other_majors = df[df['学科カテゴリー'] == 'その他']['学科'].unique()
 
 print("\n--- その他 ---")
@@ -128,7 +141,6 @@ if len(other_majors) > 0:
     for major in other_majors:
         print(f"- {major}")
 
-import pandas as pd
 
 # 日本語カテゴリから英語カテゴリへのマッピング辞書（matlibで豆腐回避するため）
 category_mapping = {
@@ -192,9 +204,6 @@ print("--- 💡 フィルタリング後の最終キーワード ---")
 print(f"使用するキーワード: {len(final_keywords_to_use)} 個")
 print(final_keywords_to_use)
 
-# -----------------------------------------------------------
-# ★★★ 修正後のデータ集計と前処理コード ★★★
-# -----------------------------------------------------------
 
 # 1. 【修正】集計に使用するTF-IDF列名の定義
 keywords_to_use_for_agg = [col for col in final_keywords_to_use if col in df.columns]
@@ -239,11 +248,6 @@ else:
 
 
     print("✅ データ集計が完了しました。")
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-import numpy as np
 
 
 analysis_target = 'Major_Category_EN'
@@ -314,7 +318,14 @@ if analysis_target in pivot_data_top_final.columns and not pivot_data_top_final.
     plt.xlabel('Keyword Index (0, 1, 2, 3, ...)')
     plt.xticks(rotation=0)
     plt.tight_layout()
-    plt.show()
+    
+    # グラフをファイルに保存
+    output_filename = 'major_category_heatmap.png'
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    print(f"✅ ヒートマップを '{output_filename}' に保存しました。")
+    
+    # GUIウィンドウを開かずにプログラムを終了
+    plt.close()
 
 else:
     print("Warning: Final data for heatmap is empty or missing the index column. Cannot plot.")
