@@ -132,7 +132,6 @@ df['学科カテゴリー'] = df['学科'].apply(categorize_major)
 
 print("✅ 学科名のカテゴリー分類が完了しました。")
 print(df['学科カテゴリー'].value_counts())
-print(df['学科カテゴリー'])
 
 other_majors = df[df['学科カテゴリー'] == 'その他']['学科'].unique()
 
@@ -166,7 +165,7 @@ df['Major_Category_EN'] = df['学科カテゴリー'].map(category_mapping).fill
 df.loc[~df['Major_Category_EN'].isin(category_mapping.values()), 'Major_Category_EN'] = 'Other'
 
 print("✅ 新しい列 'Major_Category_EN' が作成されました。")
-print(df[['学科カテゴリー', 'Major_Category_EN']].head())
+print(df[['学科カテゴリー', 'Major_Category_EN']])
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -229,9 +228,11 @@ pivot_data_en = tfidf_agg.join(count_agg, how='left')
 # TF-IDFのNaN（無関心）を0に置換
 pivot_data_en = pivot_data_en.fillna(0)
 
-# 参加者3名以上のカテゴリーに絞る
+# 全てのカテゴリーを表示（参加者数フィルタリングを緩和）
 if 'mail_count' in pivot_data_en.columns:
-    pivot_data_en = pivot_data_en[pivot_data_en['mail_count'] > 2]
+    print(f"各カテゴリーの参加者数: {pivot_data_en['mail_count'].to_dict()}")
+    # 参加者1名以上のカテゴリーに変更（全てのカテゴリーを表示）
+    pivot_data_en = pivot_data_en[pivot_data_en['mail_count'] >= 1]
     pivot_data_en = pivot_data_en.drop(columns=['mail_count']).reset_index()
 else:
     print("Warning: 'mail_count' column not available for filtering. Proceeding without filtering.")
@@ -253,7 +254,7 @@ print("✅ データ集計と番号へのリネームが完了しました。")
 
 # 3. ヒートマップの可視化
 
-plt.figure(figsize=(16, max(8, len(pivot_data_top_final) * 0.8)))
+plt.figure(figsize=(20, max(10, len(pivot_data_top_final) * 0.6)))
 
 if analysis_target in pivot_data_top_final.columns and not pivot_data_top_final.empty:
     heatmap_data = pivot_data_top_final.set_index(analysis_target)
